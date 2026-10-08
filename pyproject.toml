@@ -1,5 +1,9 @@
 [project]
 name = "lastro"
 version = "0.1.0"
+description = "Organização, Autonomia, Segurança e Gestão financeira"
+authors = [
+  { name = "Cap1s", email = "arthur.capistrano12@gmail.com" }
+]
 requires-python = ">=3.12"
 dependencies = []
