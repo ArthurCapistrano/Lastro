@@ -67,8 +67,8 @@ def test_original_storage_failure_leaves_no_history_and_allows_retry(tmp_path: P
     page = BeautifulSoup(response.data, "html.parser")
     assert "Nenhum histórico foi incorporado" in page.get_text()
     assert page.select_one('button[name="confirmar"]') is not None
-    for route in ("/importacoes", "/movimentacoes"):
-        assert "Nenhuma importação confirmada" in client.get(route).get_data(as_text=True)
+    for route, message in (("/importacoes", "Nenhuma importação confirmada"), ("/movimentacoes", "Nenhuma movimentação confirmada")):
+        assert message in client.get(route).get_data(as_text=True)
     response = client.post(action, data={"confirmar": "sim"})
     assert response.status_code == 303
     assert client.get(response.headers["Location"] + "/original").data == SAMPLE.encode("utf-8-sig")
@@ -94,15 +94,20 @@ def test_repeated_confirmation_preserves_identical_occurrences_and_line_origins(
     location = results[0][1]
     reopened = create_app(config).test_client()
     assert reopened.post(action, data={"confirmar": "sim"}).headers["Location"] == location
-    for route in (location, "/movimentacoes"):
+    for route, expected in ((location, [
+        ["6", "07/10/2026", "Crédito B3", "Resgate", "R$ 1.234,56", "R$ 1.234,56"],
+        ["7", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
+        ["9", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
+    ]), ("/movimentacoes", [
+        ["sintetico.csv — linha 7", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
+        ["sintetico.csv — linha 9", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
+        ["sintetico.csv — linha 6", "07/10/2026", "Crédito B3", "Resgate", "R$ 1.234,56", "R$ 1.234,56"],
+    ])):
         page = BeautifulSoup(reopened.get(route).data, "html.parser")
         rows = [[cell.get_text(strip=True) for cell in row.select("td")] for row in page.select("tbody tr")]
-        assert rows == [
-            ["6", "07/10/2026", "Crédito B3", "Resgate", "R$ 1.234,56", "R$ 1.234,56"],
-            ["7", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
-            ["9", "08/10/2026", "Pagamento", "Compra", "-R$ 1.253,56", "-R$ 19,00"],
-        ]
-        assert "3 novas" in page.get_text()
+        assert rows == expected
+        if route == location:
+            assert "3 novas" in page.get_text()
     assert reopened.get(location + "/original").data == content.encode("utf-8-sig")
 
 
@@ -164,8 +169,8 @@ def test_database_commit_failure_rolls_back_and_does_not_bind_account(tmp_path: 
         failure.setattr(sqlite3, "connect", connect)
         assert client.post(action, data={"confirmar": "sim"}).status_code == 503
     reopened = create_app(config).test_client()
-    for route in ("/importacoes", "/movimentacoes"):
-        assert "Nenhuma importação confirmada" in reopened.get(route).get_data(as_text=True)
+    for route, message in (("/importacoes", "Nenhuma importação confirmada"), ("/movimentacoes", "Nenhuma movimentação confirmada")):
+        assert message in reopened.get(route).get_data(as_text=True)
     other = upload(client, SAMPLE.replace("00012345", "99999999"))
     response = client.post(other, data={"confirmar": "sim"})
     assert response.status_code == 303

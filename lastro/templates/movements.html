@@ -1,0 +1,31 @@
+{% extends 'index.html' %}
+{% from 'movement_cells.html' import movement_cells %}
+{% block title %}Movimentações{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold">Movimentações</h1>
+<form action="{{ url_for('movements') }}" method="get" class="flex flex-wrap items-end gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <label class="space-y-2">Data inicial<input class="block rounded-lg border border-slate-300 p-2" type="date" name="inicio" value="{{ start }}"></label>
+  <label class="space-y-2">Data final<input class="block rounded-lg border border-slate-300 p-2" type="date" name="fim" value="{{ end }}"></label>
+  <button class="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white" type="submit">Filtrar</button>
+  <a class="font-semibold text-emerald-800 underline" href="{{ url_for('movements') }}">Limpar filtros</a>
+  <p class="w-full text-sm text-slate-600">Datas inicial e final incluídas. Deixe um campo vazio para não limitar esse lado do intervalo.</p>
+</form>
+{% if errors %}
+<div role="alert" class="space-y-2 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>
+{% elif not has_history %}
+<p>Nenhuma movimentação confirmada. <a class="underline" href="{{ url_for('index') }}">Enviar um extrato</a>.</p>
+{% elif not recorded %}
+<p>Nenhuma movimentação no intervalo informado. Ajuste as datas ou limpe os filtros para consultar o histórico.</p>
+{% else %}
+<section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" tabindex="0" aria-label="Movimentações confirmadas">
+  <table class="w-full text-left text-sm">
+    <thead class="bg-slate-50"><tr><th>Origem / Linha do CSV</th><th>Data Lançamento</th><th>Histórico</th><th>Descrição</th><th>Valor</th><th>Saldo após a movimentação</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+    {% for record in recorded %}
+      <tr><td class="p-3">{% for id, line, filename in record.origins %}<a class="block underline" href="{{ url_for('import_detail', id=id) }}">{{ filename }} — linha {{ line }}</a>{% endfor %}</td>{{ movement_cells(record.movement) }}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

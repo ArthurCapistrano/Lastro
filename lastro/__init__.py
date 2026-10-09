@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import date
 from pathlib import Path
 from secrets import token_hex
 from typing import Any
@@ -144,7 +145,23 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         return send_file(storage.original_path(id), as_attachment=True, download_name=imported.filename, mimetype="text/csv")
 
     @app.get("/movimentacoes")
-    def movements() -> str:
-        return render_template("history.html", imports=storage.imports(), recorded=storage.movements(), view="movements")
+    def movements() -> tuple[str, int]:
+        start = request.args.get("inicio", "")
+        end = request.args.get("fim", "")
+        dates: list[date | None] = []
+        errors = []
+        for value, label in ((start, "Data inicial"), (end, "Data final")):
+            try:
+                parsed = date.fromisoformat(value) if value else None
+                if parsed is not None and parsed.isoformat() != value:
+                    raise ValueError
+                dates.append(parsed)
+            except ValueError:
+                dates.append(None)
+                errors.append(f"{label} inválida. Selecione uma data válida no calendário (AAAA-MM-DD na URL).")
+        if not errors and dates[0] is not None and dates[1] is not None and dates[0] > dates[1]:
+            errors.append("A data inicial deve ser anterior ou igual à data final. Corrija o intervalo e filtre novamente.")
+        recorded = storage.movements(*dates) if not errors else []
+        return render_template("movements.html", recorded=recorded, start=start, end=end, errors=errors, has_history=storage.first() is not None), 422 if errors else 200
 
     return app

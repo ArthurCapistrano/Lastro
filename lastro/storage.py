@@ -52,7 +52,7 @@ class Comparison:
 @dataclass(frozen=True)
 class RecordedMovement:
     movement: Movement
-    origins: list[tuple[str, int]]
+    origins: list[tuple[str, int, str]]
 
 
 def movement_identity(movement: Movement) -> tuple[date, str, str, Decimal, Decimal]:
@@ -143,11 +143,12 @@ class Storage:
         with closing(self.connect()) as connection:
             return [self._import(connection, row) for row in connection.execute("SELECT * FROM imports ORDER BY imported_at, id")]
 
-    def movements(self) -> list[RecordedMovement]:
+    def movements(self, start: date | None = None, end: date | None = None) -> list[RecordedMovement]:
         with closing(self.connect()) as connection:
-            return [RecordedMovement(self._movement(row), [(origin["import_id"], origin["source_line"]) for origin in connection.execute(
-                "SELECT import_id, source_line FROM origins WHERE movement_id = ? ORDER BY import_id", (row["id"],))])
-                for row in connection.execute("SELECT * FROM movements ORDER BY id")]
+            return [RecordedMovement(self._movement(row), [(origin["import_id"], origin["source_line"], origin["filename"]) for origin in connection.execute(
+                "SELECT o.import_id, o.source_line, i.filename FROM origins o JOIN imports i ON i.id = o.import_id WHERE o.movement_id = ? ORDER BY i.imported_at, i.id", (row["id"],))])
+                for row in connection.execute("SELECT * FROM movements WHERE date >= ? AND date <= ? ORDER BY date DESC, id",
+                                              ((start or date.min).isoformat(), (end or date.max).isoformat()))]
 
     def compare(self, statement: Statement) -> Comparison:
         with closing(self.connect()) as connection:

@@ -1,6 +1,6 @@
 {% extends 'index.html' %}
 {% from 'movement_cells.html' import movement_cells %}
-{% set page_title = 'Importações' if view == 'imports' else 'Movimentações' if view == 'movements' else 'Importação confirmada' %}
+{% set page_title = 'Importações' if view == 'imports' else 'Importação confirmada' %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block content %}
 <h1 class="text-3xl font-bold">{{ page_title }}</h1>
@@ -32,19 +32,6 @@
 </section>
 {% endif %}
 {% endfor %}
-{% if view == 'movements' %}
-<section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" tabindex="0" aria-label="Movimentações confirmadas">
-  <table class="w-full text-left text-sm">
-    <thead class="bg-slate-50"><tr><th>Origem / Linha do CSV</th><th>Data Lançamento</th><th>Histórico</th><th>Descrição</th><th>Valor</th><th>Saldo após a movimentação</th></tr></thead>
-    <tbody class="divide-y divide-slate-100">
-    {% for record in recorded %}
-      {% set movement = record.movement %}
-      <tr><td class="p-3">{% for id, line in record.origins %}<a class="underline" href="{{ url_for('import_detail', id=id) }}" aria-label="Consultar extrato de origem, linha {{ line }}">{{ line }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</td>{{ movement_cells(movement) }}</tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</section>
-{% endif %}
 {% else %}
 <p>Nenhuma importação confirmada. <a class="underline" href="/">Enviar um extrato</a>.</p>
 {% endif %}

@@ -44,6 +44,14 @@ para registro aparecem normalmente com zero novas. Os detalhes permitem voltar
 à lista; endereços de importações inexistentes mostram uma mensagem sem expor
 outros arquivos locais. Não há edição nem exclusão de importações.
 
+Em **Movimentações**, o histórico consolidado aparece da data mais recente para
+a mais antiga, preservando ocorrências legítimas repetidas sem duplicá-las por
+extratos sobrepostos. Filtre por data inicial e/ou final (ambas incluídas) ou use
+**Limpar filtros** para consultar todo o histórico. Filtros inválidos e intervalos
+sem resultados recebem orientações específicas. Cada ocorrência mostra todas as
+suas origens pelo nome do CSV e pela linha original; clique para abrir a importação.
+O **Saldo após a movimentação** é o saldo daquela linha, não um saldo atual calculado.
+
 As prévias são temporárias, mantidas em memória no servidor, sem dados financeiros
 em cookies. Ao encerrar a aplicação, prévias não confirmadas são descartadas;
 envie o arquivo novamente. As respostas não são armazenáveis em cache. Os
