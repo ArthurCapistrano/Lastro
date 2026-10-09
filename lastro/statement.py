@@ -41,6 +41,10 @@ class Problem:
 class Preview:
     statement: Statement | None = None
     problems: list[Problem] = field(default_factory=list)
+    new_count: int = 0
+    existing_count: int = 0
+    overlap: bool = False
+    comparison_available: bool = False
     checks: dict[str, bool] = field(default_factory=lambda: {
         "Formato CSV reconhecido": False,
         "Metadados de conta, período e saldo": False,

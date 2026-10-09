@@ -1,5 +1,5 @@
 document.addEventListener("htmx:beforeSwap", (event) => {
-  if ([422, 413].includes(event.detail.xhr.status)) {
+  if ([409, 422, 413].includes(event.detail.xhr.status)) {
     event.detail.shouldSwap = true;
     event.detail.isError = false;
   }

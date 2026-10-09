@@ -1,7 +1,9 @@
 {% extends 'index.html' %}
+{% from 'movement_cells.html' import movement_cells %}
 {% block content %}
 <h1 class="text-3xl font-bold">{{ 'Importações' if view == 'imports' else 'Movimentações' if view == 'movements' else 'Importação confirmada' }}</h1>
-{% if imported %}
+{% if imports %}
+{% for imported in imports %}
 {% set statement = imported.statement %}
 <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
   <h2 class="text-xl font-bold"><a class="underline" href="{{ url_for('import_detail', id=imported.id) }}">{{ imported.filename }}</a></h2>
@@ -9,16 +11,30 @@
   <p>Período: {{ statement.start|date_br }} a {{ statement.end|date_br }}</p>
   <p>Saldo informado: {{ statement.balance|money }}</p>
   <p>Data de importação: {{ imported.imported_at|date_br }} {{ imported.imported_at.strftime('%H:%M:%S') }} UTC</p>
-  <p>{{ statement.movements|length }} novas · 0 já existentes · {{ statement.movements|length }} movimentações confirmadas</p>
+  <p>{{ imported.new_count }} novas · {{ imported.existing_count }} já existentes · {{ statement.movements|length }} movimentações confirmadas</p>
   <a class="inline-block font-semibold text-emerald-800 underline" href="{{ url_for('original', id=imported.id) }}">Baixar CSV original</a>
 </section>
-{% if view != 'imports' %}
+{% if view == 'detail' %}
 <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" tabindex="0" aria-label="Movimentações confirmadas">
   <table class="w-full text-left text-sm">
     <thead class="bg-slate-50"><tr><th>Linha do CSV</th><th>Data Lançamento</th><th>Histórico</th><th>Descrição</th><th>Valor</th><th>Saldo após a movimentação</th></tr></thead>
     <tbody class="divide-y divide-slate-100">
     {% for movement in statement.movements %}
-      <tr><td class="p-3"><a class="underline" href="{{ url_for('import_detail', id=imported.id) }}">{{ movement.source_line }}</a></td><td class="whitespace-nowrap p-3">{{ movement.date|date_br }}</td><td class="whitespace-pre-wrap p-3">{{ movement.history }}</td><td class="whitespace-pre-wrap p-3">{{ movement.description }}</td><td class="whitespace-nowrap p-3">{{ movement.amount|money }}</td><td class="whitespace-nowrap p-3">{{ movement.balance|money }}</td></tr>
+      <tr><td class="p-3"><a class="underline" href="{{ url_for('import_detail', id=imported.id) }}">{{ movement.source_line }}</a></td>{{ movement_cells(movement) }}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endfor %}
+{% if view == 'movements' %}
+<section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" tabindex="0" aria-label="Movimentações confirmadas">
+  <table class="w-full text-left text-sm">
+    <thead class="bg-slate-50"><tr><th>Origem / Linha do CSV</th><th>Data Lançamento</th><th>Histórico</th><th>Descrição</th><th>Valor</th><th>Saldo após a movimentação</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+    {% for record in recorded %}
+      {% set movement = record.movement %}
+      <tr><td class="p-3">{% for id, line in record.origins %}<a class="underline" href="{{ url_for('import_detail', id=id) }}" aria-label="Consultar extrato de origem, linha {{ line }}">{{ line }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</td>{{ movement_cells(movement) }}</tr>
     {% endfor %}
     </tbody>
   </table>

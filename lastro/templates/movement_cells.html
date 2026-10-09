@@ -1,0 +1,3 @@
+{% macro movement_cells(movement) -%}
+<td class="whitespace-nowrap p-3">{{ movement.date|date_br }}</td><td class="whitespace-pre-wrap p-3">{{ movement.history }}</td><td class="whitespace-pre-wrap p-3">{{ movement.description }}</td><td class="whitespace-nowrap p-3">{{ movement.amount|money }}</td><td class="whitespace-nowrap p-3">{{ movement.balance|money }}</td>
+{%- endmacro %}

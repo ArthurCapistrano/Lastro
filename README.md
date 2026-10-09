@@ -28,8 +28,9 @@ operacional é o limite de acesso assumido.
 3. Se houver erros, veja a linha original, o campo, o motivo e a orientação.
    Nenhum erro pode ser ignorado por checkbox.
 4. **Cancelar prévia** descarta a prévia sem incorporar histórico ou vincular conta.
-5. **Confirmar importação** guarda todas as ocorrências e o CSV original, vincula
-   a conta e abre o comprovante. Repetir a confirmação retorna o mesmo resultado.
+5. **Confirmar importação** guarda as ocorrências novas e o CSV original, vincula
+   a conta na primeira confirmação e abre o comprovante. Repetir a confirmação
+   retorna o mesmo resultado.
 6. Consulte o comprovante em **Importações** ou os registros em **Movimentações**.
    O comprovante informa as linhas de origem e permite baixar o CSV intacto.
 
@@ -38,9 +39,19 @@ em cookies. Ao encerrar a aplicação, prévias não confirmadas são descartada
 envie o arquivo novamente. As respostas não são armazenáveis em cache. Os
 formulários funcionam sem JavaScript; HTMX atualiza a região da prévia no upload.
 
-Nesta etapa, somente a primeira importação pode ser confirmada. Novos uploads e
-confirmações de outras prévias são bloqueados após ela; deduplicação, avisos e
-filtros de consulta pertencem aos próximos tickets.
+Novos extratos da conta vinculada são permitidos; outras contas são bloqueadas.
+A prévia informa quantidades novas e já existentes e sobreposição de períodos,
+que não é um erro. A comparação usa conta, data, histórico, descrição, valor e
+saldo interpretados, preservando a quantidade de ocorrências idênticas. Campos
+diferentes podem gerar registros novos; registros anteriores não são sobrescritos.
+Todas as linhas ficam vinculadas às ocorrências correspondentes, e uma
+movimentação pode ter origem em vários extratos.
+
+Um CSV com bytes idênticos abre a importação anterior, sem nova cópia. Um arquivo
+diferente sem movimentações novas só é guardado se você marcar **Guardar este
+extrato apenas para registro**. A confirmação reavalia o histórico; se outra
+importação deixou a prévia sem novidades, esse consentimento será solicitado.
+Avisos de divergências de saldo e filtros de consulta pertencem aos próximos tickets.
 
 ### Armazenamento e falhas
 
@@ -102,6 +113,8 @@ make browser-check
 Os testes usam a interface HTTP pública do Flask, sem consultas internas ao
 banco. A conferência adicional usa Chromium/Playwright com um servidor loopback
 temporário: verifica HTMX, erros, cancelamento, funcionamento sem JavaScript e
-layout em desktop e celular. Salva capturas **sintéticas** em
+layout em desktop e celular, além de sobreposição, origens compartilhadas,
+redirecionamento de arquivo idêntico e consentimento para zero novas.
+Salva capturas **sintéticas** em
 `/tmp/opencode/lastro-browser/` para inspeção visual. Em ambientes sem bibliotecas
 de sistema do Chromium, instale-as conforme as instruções do Playwright.

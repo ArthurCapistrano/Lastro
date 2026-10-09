@@ -131,16 +131,15 @@ def test_blocked_preview_cannot_be_confirmed_over_http(tmp_path: Path) -> None:
     assert client.post("/previas/inexistente/confirmar", data={"confirmar": "sim"}).status_code == 404
 
 
-def test_subsequent_uploads_and_stale_confirmations_are_blocked(tmp_path: Path) -> None:
+def test_other_account_uploads_and_stale_confirmations_are_blocked(tmp_path: Path) -> None:
     client = create_app({"TESTING": True, "STORAGE_PATH": str(tmp_path)}).test_client()
     first = upload(client)
     stale = upload(client, SAMPLE.replace("00012345", "99999999"))
     response = client.post(first, data={"confirmar": "sim"})
     location = response.headers["Location"]
-    for content in (SAMPLE, SAMPLE.replace("00012345", "99999999")):
-        response = client.post("/previa", data={"arquivo": (BytesIO(content.encode()), "novo.csv")})
-        assert response.status_code == 409
-        assert "Importações sucessivas ainda não estão disponíveis" in response.get_data(as_text=True)
+    response = client.post("/previa", data={"arquivo": (BytesIO(SAMPLE.replace("00012345", "99999999").encode()), "novo.csv")})
+    assert response.status_code == 409
+    assert "Conta diferente da conta vinculada (00012345)" in response.get_data(as_text=True)
     assert client.post(stale, data={"confirmar": "sim"}).status_code == 409
     assert len(BeautifulSoup(client.get(location).data, "html.parser").select("tbody tr")) == 2
     assert "99999999" not in client.get("/importacoes").get_data(as_text=True)
@@ -182,7 +181,7 @@ def test_confirmation_returns_existing_result_when_other_request_removes_preview
     class PausingConnection(sqlite3.Connection):
         def execute(self, sql: str, parameters: Any = ()) -> sqlite3.Cursor:
             cursor = super().execute(sql, parameters)
-            if sql == "SELECT * FROM imports LIMIT 1" and not paused.is_set():
+            if "UNION ALL SELECT import_id AS id FROM confirmations" in sql and not paused.is_set():
                 paused.set()
                 assert resume.wait(timeout=10)
             return cursor
