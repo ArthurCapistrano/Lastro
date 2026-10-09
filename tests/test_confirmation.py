@@ -80,9 +80,11 @@ def test_repeated_confirmation_preserves_identical_occurrences_and_line_origins(
     client = app.test_client()
     content = SAMPLE + "\n08/10/2026;Pagamento;Compra;-1.253,56;-19,00\n"
     action = upload(client, content)
+    review = BeautifulSoup(client.post(action).data, "html.parser")
+    warnings = [str(box["value"]) for box in review.select('input[name="reconhecer_avisos"]')]
 
     def confirm() -> tuple[int, str]:
-        response = app.test_client().post(action, data={"confirmar": "sim"})
+        response = app.test_client().post(action, data={"confirmar": "sim", "reconhecer_avisos": warnings})
         return response.status_code, response.headers.get("Location", "")
 
     with ThreadPoolExecutor(max_workers=2) as executor:

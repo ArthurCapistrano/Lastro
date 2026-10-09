@@ -27,6 +27,8 @@ operacional é o limite de acesso assumido.
 2. Confira conta, período, saldo informado, checklist e movimentações.
 3. Se houver erros, veja a linha original, o campo, o motivo e a orientação.
    Nenhum erro pode ser ignorado por checkbox.
+   Se houver avisos, confira os registros envolvidos e marque cada checkbox de
+   reconhecimento antes de confirmar; o servidor também exige essa revisão.
 4. **Cancelar prévia** descarta a prévia sem incorporar histórico ou vincular conta.
 5. **Confirmar importação** guarda as ocorrências novas e o CSV original, vincula
    a conta na primeira confirmação e abre o comprovante. Repetir a confirmação
@@ -51,7 +53,21 @@ Um CSV com bytes idênticos abre a importação anterior, sem nova cópia. Um ar
 diferente sem movimentações novas só é guardado se você marcar **Guardar este
 extrato apenas para registro**. A confirmação reavalia o histórico; se outra
 importação deixou a prévia sem novidades, esse consentimento será solicitado.
-Avisos de divergências de saldo e filtros de consulta pertencem aos próximos tickets.
+
+A prévia avisa quando uma ocorrência nova equivale a um registro conhecido em
+conta, data, histórico, descrição e valor, mas tem saldo diferente. O aviso dá
+acesso à importação anterior e pode representar uma movimentação legítima repetida:
+não há mescla, exclusão nem sobrescrita automática. Ocorrências já representadas
+no histórico são informação normal, não exigem esse reconhecimento adicional.
+
+Os saldos sucessivos são conferidos em ordem crescente de datas (mantendo a ordem
+do banco no mesmo dia), ou decrescente com datas distintas. Ordens ambíguas não são
+conferidas. A primeira linha não tem saldo anterior conhecido; o saldo dos metadados
+não é usado como saldo inicial. A conferência não comprova que o extrato está
+completo. Incoerências são avisos, não erros; valores e saldos negativos são válidos.
+Cada aviso exige seu próprio reconhecimento, inclusive quando surgir ao reavaliar
+o histórico na confirmação. Pares de linhas já importadas não exigem nova revisão;
+incoerências envolvendo ocorrências novas exigem. Os dados originais permanecem intactos.
 
 ### Armazenamento e falhas
 
@@ -114,7 +130,8 @@ Os testes usam a interface HTTP pública do Flask, sem consultas internas ao
 banco. A conferência adicional usa Chromium/Playwright com um servidor loopback
 temporário: verifica HTMX, erros, cancelamento, funcionamento sem JavaScript e
 layout em desktop e celular, além de sobreposição, origens compartilhadas,
-redirecionamento de arquivo idêntico e consentimento para zero novas.
+redirecionamento de arquivo idêntico, consentimento para zero novas e reconhecimento
+individual dos avisos de saldo.
 Salva capturas **sintéticas** em
 `/tmp/opencode/lastro-browser/` para inspeção visual. Em ambientes sem bibliotecas
 de sistema do Chromium, instale-as conforme as instruções do Playwright.

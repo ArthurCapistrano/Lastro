@@ -9,7 +9,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from .statement import Preview, Problem, format_date, format_money, read_statement
-from .storage import ConsentRequired, ImportUnavailable, Storage
+from .storage import ConsentRequired, ImportUnavailable, Storage, WarningReviewRequired
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
@@ -46,6 +46,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             result.existing_count = comparison.existing_count
             result.overlap = comparison.overlap
             result.comparison_available = True
+            result.warnings = comparison.warnings
             valid_account = comparison.linked_account in (None, result.statement.account)
             result.checks["Conta corrente vinculada"] = valid_account
             if not valid_account:
@@ -114,7 +115,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if request.form.get("confirmar") != "sim":
             return render_preview(result, 422, token, "Confirmação explícita obrigatória. Confira a prévia e clique em Confirmar importação.")
         try:
-            imported_id = storage.confirm(token, filename, content, result.statement, keep_without_new=request.form.get("guardar_sem_novidades") == "sim")
+            imported_id = storage.confirm(token, filename, content, result.statement, keep_without_new=request.form.get("guardar_sem_novidades") == "sim", acknowledged_warnings=set(request.form.getlist("reconhecer_avisos")))
+        except WarningReviewRequired:
+            return render_preview(compare_preview(content), 422, token, "Reconheça explicitamente todos os avisos por checkbox antes de confirmar.")
         except ConsentRequired:
             return render_preview(compare_preview(content), 422, token, "Este extrato não tem movimentações novas. É necessário consentimento explícito para guardá-lo apenas para registro.")
         except ImportUnavailable:

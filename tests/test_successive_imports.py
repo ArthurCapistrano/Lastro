@@ -37,6 +37,13 @@ def confirm(client: FlaskClient, action: str, *, keep: bool = False) -> str:
     if keep:
         data["guardar_sem_novidades"] = "sim"
     response = client.post(action, data=data)
+    if response.status_code == 422:
+        # These scenarios exercise deduplication, including intentionally
+        # repeated bank rows. Explicitly review any balance warnings first.
+        page = BeautifulSoup(response.data, "html.parser")
+        warnings = [str(box["value"]) for box in page.select('input[name="reconhecer_avisos"]')]
+        if warnings:
+            response = client.post(action, data={**data, "reconhecer_avisos": warnings})
     assert response.status_code == 303
     return response.headers["Location"]
 
@@ -174,7 +181,9 @@ def test_failure_in_later_import_preserves_history_and_allows_retry(tmp_path: Pa
 
     with monkeypatch.context() as failure:
         failure.setattr(os, "fsync", fail_sync)
-        assert client.post(action, data={"confirmar": "sim"}).status_code == 503
+        review = BeautifulSoup(client.post(action).data, "html.parser")
+        warnings = [str(box["value"]) for box in review.select('input[name="reconhecer_avisos"]')]
+        assert client.post(action, data={"confirmar": "sim", "reconhecer_avisos": warnings}).status_code == 503
     assert rows(client, "/movimentacoes") == before
     assert "posterior.csv" not in client.get("/importacoes").get_data(as_text=True)
     assert client.get(first + "/original").data == (HEADER + PAYMENT).encode()

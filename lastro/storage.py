@@ -8,7 +8,7 @@ from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 
-from .statement import Movement, Statement
+from .statement import Movement, ReviewWarning, Statement, balance_warnings, format_date, format_money
 
 
 class ImportUnavailable(Exception):
@@ -16,6 +16,10 @@ class ImportUnavailable(Exception):
 
 
 class ConsentRequired(Exception):
+    pass
+
+
+class WarningReviewRequired(Exception):
     pass
 
 
@@ -34,6 +38,7 @@ class Comparison:
     matches: list[int | None]
     overlap: bool
     linked_account: str | None
+    warnings: list[ReviewWarning]
 
     @property
     def new_count(self) -> int:
@@ -153,21 +158,36 @@ class Storage:
         account = connection.execute("SELECT account FROM imports LIMIT 1").fetchone()
         linked_account = account["account"] if account else None
         known: dict[tuple[date, str, str, Decimal, Decimal], deque[int]] = defaultdict(deque)
-        for row in connection.execute("SELECT m.* FROM movements m JOIN imports i ON i.id = m.import_id WHERE i.account = ? ORDER BY m.id", (statement.account,)):
+        equivalent: dict[tuple[date, str, str, Decimal], list[sqlite3.Row]] = defaultdict(list)
+        for row in connection.execute("SELECT m.*, i.filename FROM movements m JOIN imports i ON i.id = m.import_id WHERE i.account = ? ORDER BY m.id", (statement.account,)):
             movement = self._movement(row)
             known[movement_identity(movement)].append(row["id"])
+            equivalent[(movement.date, movement.history, movement.description, movement.amount)].append(row)
         matches: list[int | None] = []
+        warnings: list[ReviewWarning] = []
         for movement in statement.movements:
             occurrences = known[movement_identity(movement)]
             matches.append(occurrences.popleft() if occurrences else None)
+            if matches[-1] is None:
+                for row in equivalent[(movement.date, movement.history, movement.description, movement.amount)]:
+                    if Decimal(row["balance"]) != movement.balance:
+                        warnings.append(ReviewWarning(
+                            f"Linha {movement.source_line} — possível divergência: conta {statement.account}, "
+                            f"{format_date(movement.date)}, {movement.history}, {movement.description}, valor {format_money(movement.amount)}. "
+                            f"Saldo informado {format_money(movement.balance)}; registro conhecido em {row['filename']} "
+                            f"(linha {row['source_line']}): {format_money(Decimal(row['balance']))}.",
+                            "Pode representar uma movimentação legítima repetida. Confira o original e a importação anterior; não haverá mescla, exclusão ou sobrescrita automática.",
+                            row["import_id"],
+                        ))
         overlap = connection.execute("SELECT 1 FROM imports WHERE account = ? AND start <= ? AND end >= ? LIMIT 1",
                                      (statement.account, statement.end.isoformat(), statement.start.isoformat())).fetchone() is not None
-        return Comparison(matches, overlap, linked_account)
+        new_lines = {movement.source_line for movement, match in zip(statement.movements, matches) if match is None}
+        return Comparison(matches, overlap, linked_account, balance_warnings(statement, new_lines) + warnings)
 
     def original_path(self, id: str) -> Path:
         return self.path / "originals" / f"{id}.csv"
 
-    def confirm(self, id: str, filename: str, content: bytes, statement: Statement, *, keep_without_new: bool = False) -> str:
+    def confirm(self, id: str, filename: str, content: bytes, statement: Statement, *, keep_without_new: bool = False, acknowledged_warnings: set[str] | None = None) -> str:
         with closing(self.connect()) as connection:
             # Compare against current history while serializing all writes.
             connection.execute("BEGIN IMMEDIATE")
@@ -184,6 +204,8 @@ class Storage:
                 comparison = self._compare(connection, statement)
                 if comparison.linked_account is not None and comparison.linked_account != statement.account:
                     raise ImportUnavailable
+                if any(warning.key not in (acknowledged_warnings or set()) for warning in comparison.warnings):
+                    raise WarningReviewRequired
                 if comparison.new_count == 0 and not keep_without_new:
                     raise ConsentRequired
                 original = self.original_path(id)

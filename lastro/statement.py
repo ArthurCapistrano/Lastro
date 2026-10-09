@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, date
 from decimal import Decimal
 from io import StringIO
+from hashlib import sha256
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,17 @@ class Problem:
     field: str | None = None
 
 
+@dataclass(frozen=True)
+class ReviewWarning:
+    reason: str
+    guidance: str
+    related_import: str | None = None
+
+    @property
+    def key(self) -> str:
+        return sha256(f"{self.related_import}:{self.reason}".encode()).hexdigest()
+
+
 @dataclass
 class Preview:
     statement: Statement | None = None
@@ -45,6 +57,7 @@ class Preview:
     existing_count: int = 0
     overlap: bool = False
     comparison_available: bool = False
+    warnings: list[ReviewWarning] = field(default_factory=list)
     checks: dict[str, bool] = field(default_factory=lambda: {
         "Formato CSV reconhecido": False,
         "Metadados de conta, período e saldo": False,
@@ -159,6 +172,29 @@ def read_statement(content: bytes) -> Preview:
     if result.checks["Metadados de conta, período e saldo"] and start is not None and end is not None and balance is not None:
         result.statement = Statement(metadata["Conta"][1], start, end, balance, movements)
     return result
+
+
+def balance_warnings(statement: Statement, new_lines: set[int]) -> list[ReviewWarning]:
+    movements = statement.movements
+    if all(left.date <= right.date for left, right in zip(movements, movements[1:])):
+        ordered = movements
+    elif all(left.date > right.date for left, right in zip(movements, movements[1:])):
+        ordered = list(reversed(movements))
+    else:
+        return []
+    warnings = []
+    for previous, current in zip(ordered, ordered[1:]):
+        if previous.source_line not in new_lines and current.source_line not in new_lines:
+            continue
+        expected = previous.balance + current.amount
+        if expected != current.balance:
+            warnings.append(ReviewWarning(
+                f"Linhas {previous.source_line} e {current.source_line} — possível incoerência entre saldos sucessivos: "
+                f"saldo {format_money(previous.balance)} + valor {format_money(current.amount)} = {format_money(expected)}, "
+                f"mas o saldo após a movimentação informado é {format_money(current.balance)}.",
+                "Confira as duas linhas no CSV original. Os valores do banco serão preservados, sem correção automática.",
+            ))
+    return warnings
 
 
 def format_money(value: Decimal) -> str:

@@ -25,6 +25,17 @@
     {% else %}
     <p class="mt-4 font-semibold text-emerald-800">Leitura concluída. Confira os dados abaixo.</p>
     {% endif %}
+    {% if result.comparison_available %}
+    <p class="mt-4 text-sm text-slate-600">Conferência de saldos sucessivos em ordem cronológica comparável, mantendo a ordem das linhas do banco no mesmo dia; ordem ambígua não é conferida. Esta verificação não comprova que o extrato está completo.</p>
+    {% if not result.warnings %}<p class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900"><strong>Concluída</strong> — Conferência dos registros comparáveis sem novos avisos que exijam reconhecimento.</p>{% endif %}
+    {% endif %}
+    {% if result.warnings %}
+    <ul class="mt-4 space-y-3">
+      {% for warning in result.warnings %}
+      <li class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Aviso aguardando revisão</strong> — {{ warning.reason }} {{ warning.guidance }}{% if warning.related_import %} <a class="font-semibold underline" href="{{ url_for('import_detail', id=warning.related_import) }}" target="_blank" rel="noopener">Consultar importação anterior</a>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
     <p class="mt-4 text-sm text-slate-600">Nenhum histórico foi incorporado por esta prévia; os registros anteriores permanecem inalterados.</p>
   </section>
   {% if statement %}
@@ -59,6 +70,7 @@
     {% if result.comparison_available %}<p class="mb-4">{{ result.new_count }} novas · {{ result.existing_count }} já existentes. A confirmação guarda o CSV original e mantém esta conta corrente vinculada.</p>{% else %}<p class="mb-4">Comparação com o histórico indisponível. As contagens e a necessidade de consentimento serão reavaliadas ao tentar novamente.</p>{% endif %}
     {% if result.overlap %}<p class="mb-4 rounded-lg bg-slate-50 p-4">Sobreposição de períodos: este extrato abrange um período já registrado. Isso não é um erro; somente ocorrências novas serão incorporadas.</p>{% endif %}
     {% if result.comparison_available and result.new_count == 0 %}<label class="mb-4 flex items-start gap-3"><input type="checkbox" name="guardar_sem_novidades" value="sim" required class="mt-1">Guardar este extrato apenas para registro, sem acrescentar movimentações ao histórico.</label>{% endif %}
+    {% for warning in result.warnings %}<label class="mb-4 flex items-start gap-3"><input type="checkbox" name="reconhecer_avisos" value="{{ warning.key }}" required class="mt-1">Reconheço o aviso: {{ warning.reason }} Decido importar preservando os dados originais.</label>{% endfor %}
     <button name="confirmar" value="sim" class="rounded-lg bg-emerald-800 px-5 py-3 font-semibold text-white hover:bg-emerald-900">Confirmar importação</button>
   </form>
   {% endif %}
