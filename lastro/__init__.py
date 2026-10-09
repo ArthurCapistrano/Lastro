@@ -3,7 +3,7 @@ from typing import Any
 from flask import Flask, Response, abort, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from .statement import Preview, Problem, format_money, read_statement
+from .statement import Preview, Problem, format_date, format_money, read_statement
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
@@ -12,6 +12,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     if config:
         app.config.update(config)
     app.jinja_env.filters["money"] = format_money
+    app.jinja_env.filters["date_br"] = format_date
 
     @app.before_request
     def require_local_access() -> None:

@@ -148,3 +148,54 @@ def test_money_is_not_rounded_even_above_decimal_context_precision() -> None:
     )
     assert response.status_code == 200
     assert "R$ 123.456.789.012.345.678.901.234.567.890,12" in response.get_data(as_text=True)
+
+
+def test_metadata_error_does_not_hide_record_errors() -> None:
+    content = STATEMENT.replace("Saldo ;-19,00", "Saldo ;ilegível").replace("-1.253,56;-19,00", "abc;def")
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 422
+    text = BeautifulSoup(response.data, "html.parser").get_text(" ", strip=True)
+    for message in ("Linha 4 — Saldo", "Linha 8 — Valor", "Linha 8 — Saldo"):
+        assert message in text
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ("07/10/2026;Crédito;Registro antecipado;1,00;1,00\n", "Linha inesperada antes da tabela"),
+        ("Conta;99999999;;;\n", "Metadado duplicado: Conta"),
+        ("Saldo;-19,00;;;\n", "Metadado duplicado: Saldo"),
+    ],
+)
+def test_unexpected_and_duplicate_metadata_cannot_be_silently_discarded(extra: str, message: str) -> None:
+    content = STATEMENT.replace("Data Lançamento;", extra + "Data Lançamento;")
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 422
+    text = BeautifulSoup(response.data, "html.parser").get_text(" ", strip=True)
+    assert message in text
+    assert "Linha 6" in text
+
+
+def test_four_digit_year_is_preserved_in_metadata_and_movements() -> None:
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(STATEMENT.replace("2026", "0001").encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 200
+    text = BeautifulSoup(response.data, "html.parser").get_text(" ", strip=True)
+    assert "01/10/0001 a 08/10/0001" in text
+    assert "07/10/0001" in text
+
+
+def test_empty_field_does_not_hide_other_errors_in_same_record() -> None:
+    content = STATEMENT.replace("08/10/2026;Pagamento;Compra;-1.253,56;-19,00", "31/02/2026;;Compra;abc;def")
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 422
+    text = BeautifulSoup(response.data, "html.parser").get_text(" ", strip=True)
+    for field in ("Data Lançamento", "Histórico", "Valor", "Saldo"):
+        assert f"Linha 8 — {field}" in text

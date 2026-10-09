@@ -89,31 +89,42 @@ def read_statement(content: bytes) -> Preview:
         result.problems.append(Problem("Colunas obrigatórias ausentes ou diferentes: " + ", ".join(COLUMNS) + "."))
         return result
     result.checks["Colunas obrigatórias"] = True
-    metadata = {row[0]: (line, row[1]) for line, row in rows[1:header] if len(row) > 1}
+    metadata: dict[str, tuple[int, str]] = {}
+    for line, row in rows[1:header]:
+        name = row[0]
+        if name not in ("Conta", "Período", "Saldo"):
+            result.problems.append(Problem("Linha inesperada antes da tabela; formato desconhecido.", line=line, field="Registro"))
+        elif name in metadata:
+            result.problems.append(Problem(f"Metadado duplicado: {name}.", line=line, field=name))
+        elif len(row) < 2 or any(row[2:]):
+            result.problems.append(Problem("Estrutura do metadado inválida: esperado rótulo e valor.", line=line, field=name))
+        else:
+            metadata[name] = (line, row[1])
     for name in ("Conta", "Período", "Saldo"):
         if name not in metadata or not metadata[name][1]:
             result.problems.append(Problem(f"Metadado obrigatório ausente: {name}."))
-    if result.problems:
-        return result
-    try:
-        start_text, end_text = metadata["Período"][1].split(" a ")
-        start, end = brazilian_date(start_text), brazilian_date(end_text)
-        if start > end:
-            result.problems.append(Problem("Período invertido: início posterior ao fim.", line=metadata["Período"][0], field="Período"))
-    except ValueError:
-        result.problems.append(Problem("Período ilegível; esperado DD/MM/AAAA a DD/MM/AAAA.", line=metadata["Período"][0], field="Período"))
-    try:
-        balance = money(metadata["Saldo"][1])
-    except ValueError as error:
-        result.problems.append(Problem(str(error), line=metadata["Saldo"][0], field="Saldo"))
-    if result.problems:
-        return result
-    result.checks["Metadados de conta, período e saldo"] = True
+    start = end = None
+    balance = None
+    if "Período" in metadata and metadata["Período"][1]:
+        try:
+            start_text, end_text = metadata["Período"][1].split(" a ")
+            start, end = brazilian_date(start_text), brazilian_date(end_text)
+            if start > end:
+                result.problems.append(Problem("Período invertido: início posterior ao fim.", line=metadata["Período"][0], field="Período"))
+        except ValueError:
+            result.problems.append(Problem("Período ilegível; esperado DD/MM/AAAA a DD/MM/AAAA.", line=metadata["Período"][0], field="Período"))
+    if "Saldo" in metadata and metadata["Saldo"][1]:
+        try:
+            balance = money(metadata["Saldo"][1])
+        except ValueError as error:
+            result.problems.append(Problem(str(error), line=metadata["Saldo"][0], field="Saldo"))
+    result.checks["Metadados de conta, período e saldo"] = not result.problems
     if not rows[header + 1:]:
         result.problems.append(Problem("Nenhuma movimentação encontrada no extrato."))
     else:
         result.checks["Presença de movimentações"] = True
     movements: list[Movement] = []
+    record_problems_before = len(result.problems)
     for line, row in rows[header + 1:]:
         problems_before = len(result.problems)
         for i, name in enumerate(COLUMNS):
@@ -123,25 +134,32 @@ def read_statement(content: bytes) -> Preview:
                 result.problems.append(Problem("Campo obrigatório vazio.", "Confira o campo no arquivo original e exporte novamente o extrato completo.", line, name))
         if len(row) > len(COLUMNS):
             result.problems.append(Problem("Colunas extras na movimentação.", "Confira o separador ponto e vírgula e as aspas dos campos no arquivo original.", line, "Registro"))
-        if len(result.problems) != problems_before:
-            continue
-        try:
-            movement_date = brazilian_date(row[0])
-        except ValueError:
-            result.problems.append(Problem("Data ilegível ou inexistente.", "Confira a data no arquivo original; esperado DD/MM/AAAA.", line, "Data Lançamento"))
+        movement_date = None
+        if row[0]:
+            try:
+                movement_date = brazilian_date(row[0])
+            except ValueError:
+                result.problems.append(Problem("Data ilegível ou inexistente.", "Confira a data no arquivo original; esperado DD/MM/AAAA.", line, "Data Lançamento"))
         amounts: dict[str, Decimal] = {}
-        for name, value in zip(("Valor", "Saldo"), row[3:]):
+        for name, value in zip(("Valor", "Saldo"), row[3:5]):
+            if not value:
+                continue
             try:
                 amounts[name] = money(value)
             except ValueError as error:
                 result.problems.append(Problem(str(error), "Confira o valor no arquivo original; exemplo válido: -1.234,56.", line, name))
-        if len(result.problems) == problems_before:
+        if len(result.problems) == problems_before and movement_date is not None:
             movements.append(Movement(movement_date, row[1], row[2], amounts["Valor"], amounts["Saldo"]))
-    result.checks["Campos, datas e valores das movimentações"] = bool(movements) and not result.problems
-    result.statement = Statement(metadata["Conta"][1], start, end, balance, movements)
+    result.checks["Campos, datas e valores das movimentações"] = bool(movements) and len(result.problems) == record_problems_before
+    if result.checks["Metadados de conta, período e saldo"] and start is not None and end is not None and balance is not None:
+        result.statement = Statement(metadata["Conta"][1], start, end, balance, movements)
     return result
 
 
 def format_money(value: Decimal) -> str:
     formatted = f"{value.copy_abs():,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"{'-' if value < 0 else ''}R$ {formatted}"
+
+
+def format_date(value: date) -> str:
+    return f"{value.day:02d}/{value.month:02d}/{value.year:04d}"
