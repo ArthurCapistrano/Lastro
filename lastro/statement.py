@@ -13,6 +13,7 @@ class Movement:
     description: str
     amount: Decimal
     balance: Decimal
+    source_line: int
 
 
 @dataclass(frozen=True)
@@ -149,7 +150,7 @@ def read_statement(content: bytes) -> Preview:
             except ValueError as error:
                 result.problems.append(Problem(str(error), "Confira o valor no arquivo original; exemplo válido: -1.234,56.", line, name))
         if len(result.problems) == problems_before and movement_date is not None:
-            movements.append(Movement(movement_date, row[1], row[2], amounts["Valor"], amounts["Saldo"]))
+            movements.append(Movement(movement_date, row[1], row[2], amounts["Valor"], amounts["Saldo"], line))
     result.checks["Campos, datas e valores das movimentações"] = bool(movements) and len(result.problems) == record_problems_before
     if result.checks["Metadados de conta, período e saldo"] and start is not None and end is not None and balance is not None:
         result.statement = Statement(metadata["Conta"][1], start, end, balance, movements)

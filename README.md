@@ -27,13 +27,33 @@ operacional é o limite de acesso assumido.
 2. Confira conta, período, saldo informado, checklist e movimentações.
 3. Se houver erros, veja a linha original, o campo, o motivo e a orientação.
    Nenhum erro pode ser ignorado por checkbox.
-4. **Cancelar prévia** volta ao início. Nada é gravado, inclusive após uma
-   leitura válida. A confirmação persistente pertence ao próximo ticket.
+4. **Cancelar prévia** descarta a prévia sem incorporar histórico ou vincular conta.
+5. **Confirmar importação** guarda todas as ocorrências e o CSV original, vincula
+   a conta e abre o comprovante. Repetir a confirmação retorna o mesmo resultado.
+6. Consulte o comprovante em **Importações** ou os registros em **Movimentações**.
+   O comprovante informa as linhas de origem e permite baixar o CSV intacto.
 
-O upload é lido em memória, sem guardar o arquivo, criar banco de dados, vincular
-conta ou manter informações na sessão. As respostas não são armazenáveis em
-cache. O formulário funciona sem JavaScript; HTMX atualiza só a região da prévia
-quando disponível.
+As prévias são temporárias, mantidas em memória no servidor, sem dados financeiros
+em cookies. Ao encerrar a aplicação, prévias não confirmadas são descartadas;
+envie o arquivo novamente. As respostas não são armazenáveis em cache. Os
+formulários funcionam sem JavaScript; HTMX atualiza a região da prévia no upload.
+
+Nesta etapa, somente a primeira importação pode ser confirmada. Novos uploads e
+confirmações de outras prévias são bloqueados após ela; deduplicação, avisos e
+filtros de consulta pertencem aos próximos tickets.
+
+### Armazenamento e falhas
+
+A aplicação cria automaticamente `instance/lastro.sqlite3` e `instance/originals/`,
+fora do Git. Para escolher outro local, defina `LASTRO_STORAGE_PATH` antes de
+executar. Reabra com o mesmo armazenamento para consultar o histórico. Para backup,
+encerre a aplicação e copie a pasta inteira, incluindo banco e originais.
+
+Uma transação SQLite serializa a confirmação: o original é gravado e sincronizado
+em disco antes de confirmar os registros. Falhas revertem os registros e não
+vinculam conta; a prévia permite tentar novamente. Uma falha no commit ou interrupção pode
+deixar um CSV sem referência, mas nunca o apresenta como importação confirmada.
+Não mova ou apague arquivos do armazenamento manualmente.
 
 ### Formato suportado
 

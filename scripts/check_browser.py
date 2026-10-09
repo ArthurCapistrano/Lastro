@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from threading import Thread
+from tempfile import TemporaryDirectory
 
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
@@ -23,7 +24,8 @@ Data Lançamento;Histórico;Descrição;Valor;Saldo
 def main() -> None:
     output = Path("/tmp/opencode/lastro-browser")
     output.mkdir(parents=True, exist_ok=True)
-    server = make_server("127.0.0.1", 0, create_app())
+    storage = TemporaryDirectory(prefix="lastro-browser-", dir="/tmp/opencode")
+    server = make_server("127.0.0.1", 0, create_app({"STORAGE_PATH": storage.name}))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base_url = f"http://127.0.0.1:{server.server_port}"
@@ -48,9 +50,9 @@ def main() -> None:
             page.screenshot(path=str(output / "desktop-preview.png"), full_page=True)
             page.set_viewport_size({"width": 375, "height": 812})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-            expect(page.get_by_role("link", name="Cancelar prévia")).to_be_visible()
+            expect(page.get_by_role("button", name="Cancelar prévia")).to_be_visible()
             page.screenshot(path=str(output / "mobile-preview.png"), full_page=True)
-            page.get_by_role("link", name="Cancelar prévia").click()
+            page.get_by_role("button", name="Cancelar prévia").click()
             expect(page.locator("tbody tr")).to_have_count(0)
             variable_decimals = SAMPLE.replace("Saldo;-19,00", "Saldo;-19").replace("1.234,56;1.234,56", "-19;1.234,5").replace("-1.253,56;-19,00", "-51,8;1.313")
             page.locator("#arquivo").set_input_files({"name": "casas-variaveis.csv", "mimeType": "text/csv", "buffer": variable_decimals.encode()})
@@ -77,14 +79,39 @@ def main() -> None:
             page.get_by_role("button", name="Conferir prévia").click()
             expect(page.locator("tbody tr")).to_have_count(2)
             assert page.url.endswith("/previa")
-            page.get_by_role("link", name="Cancelar prévia").click()
+            page.get_by_role("button", name="Cancelar prévia").click()
             expect(page.locator("tbody tr")).to_have_count(0)
+            page.locator("#arquivo").set_input_files({"name": "sintetico.csv", "mimeType": "text/csv", "buffer": SAMPLE.encode()})
+            page.get_by_role("button", name="Conferir prévia").click()
+            page.get_by_role("button", name="Confirmar importação").click()
+            expect(page.get_by_role("heading", name="Importação confirmada")).to_be_visible()
+            expect(page.locator("tbody tr")).to_have_count(2)
+            expect(page.get_by_text("2 novas · 0 já existentes")).to_be_visible()
+            detail_url = page.url
             no_js.close()
+            context = browser.new_context(viewport={"width": 1440, "height": 1050})
+            page = context.new_page()
+            page.goto(detail_url)
+            page.screenshot(path=str(output / "desktop-confirmed.png"), full_page=True)
+            with page.expect_download() as download:
+                page.get_by_role("link", name="Baixar CSV original").click()
+            downloaded = download.value.path()
+            assert downloaded is not None and Path(downloaded).read_bytes() == SAMPLE.encode()
+            page.set_viewport_size({"width": 375, "height": 812})
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            page.screenshot(path=str(output / "mobile-confirmed.png"), full_page=True)
+            page.get_by_role("link", name="Importações", exact=True).click()
+            expect(page.get_by_role("link", name="sintetico.csv")).to_be_visible()
+            page.goto(base_url)
+            expect(page.get_by_text("Importações sucessivas ainda não estão disponíveis.")).to_be_visible()
+            expect(page.get_by_role("button", name="Conferir prévia")).to_have_count(0)
+            context.close()
             browser.close()
     finally:
         server.shutdown()
         thread.join()
         server.server_close()
+        storage.cleanup()
     print(f"Browser checks passed. Synthetic screenshots: {output}")
 
 

@@ -19,10 +19,10 @@ def test_upload_cancel_and_reopen_do_not_keep_preview_or_bind_account() -> None:
     client = create_app({"TESTING": True}).test_client()
     response = client.post("/previa", data={"arquivo": (BytesIO(SAMPLE.encode()), "sintetico.csv")})
     page = BeautifulSoup(response.data, "html.parser")
-    cancel = page.find("a", string="Cancelar prévia")
+    cancel = page.select_one('form[action$="/cancelar"]')
     assert isinstance(cancel, Tag)
-    assert cancel.get("href") == "/"
-    assert "Nada foi gravado" in page.get_text()
+    assert client.post(str(cancel["action"])).status_code == 303
+    assert "Nenhum histórico foi incorporado" in page.get_text()
     assert "1 movimentação" in page.get_text()
     assert "Set-Cookie" not in response.headers
     for fresh_client in (client, create_app({"TESTING": True}).test_client()):

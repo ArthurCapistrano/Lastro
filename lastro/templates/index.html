@@ -12,15 +12,19 @@
     <header class="border-b border-slate-200 bg-white">
       <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 sm:px-8">
         <a href="/" class="text-2xl font-bold tracking-tight text-emerald-800">Lastro<span class="text-emerald-500">.</span></a>
-        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">Local · sem gravação</span>
+        <nav class="flex gap-4 text-sm font-semibold"><a href="/importacoes">Importações</a><a href="/movimentacoes">Movimentações</a></nav>
       </div>
     </header>
     <main class="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-8 sm:py-12">
+      {% block content %}
       <div class="max-w-2xl space-y-3">
         <p class="text-sm font-semibold uppercase tracking-widest text-emerald-700">Importação de extrato</p>
         <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Confira antes de guardar.</h1>
-        <p class="text-slate-600">Envie seu CSV de conta corrente para conferir a leitura. Seus dados permanecem nesta máquina; nesta entrega, nada é salvo no histórico.</p>
+        <p class="text-slate-600">Envie seu CSV de conta corrente para conferir a leitura. Seus dados permanecem nesta máquina e só entram no histórico após sua confirmação.</p>
       </div>
+      {% if imported %}
+      <p class="rounded-lg bg-emerald-50 p-4">Importações sucessivas ainda não estão disponíveis. <a class="underline" href="{{ url_for('import_detail', id=imported.id) }}">Consultar a primeira importação confirmada</a>.</p>
+      {% else %}
       <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Envio do extrato">
         <form action="/previa" method="post" enctype="multipart/form-data" hx-post="/previa" hx-encoding="multipart/form-data" hx-target="#resultado" hx-swap="outerHTML" hx-disabled-elt="button" hx-indicator="#progresso" class="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div class="min-w-0 flex-1">
@@ -33,8 +37,10 @@
         </form>
         <p id="falha-rede" role="alert" class="mt-3 text-red-800" hidden>Não foi possível enviar o arquivo. Confira se o Lastro está em execução e tente novamente.</p>
       </section>
+      {% endif %}
       {% include 'preview.html' %}
-      <footer class="border-t border-slate-200 pt-6 text-sm text-slate-500">Sem categorização, alterações ou confirmação persistente nesta entrega.</footer>
+      {% endblock %}
+      <footer class="border-t border-slate-200 pt-6 text-sm text-slate-500">Armazenamento local · sem categorização ou alteração de registros.</footer>
     </main>
   </body>
 </html>
