@@ -52,8 +52,12 @@ Data Lançamento;Histórico;Descrição;Valor;Saldo
 08/10/2026;Pagamento;Compra;-1.253,56;-19,00
 ```
 
-Datas usam `DD/MM/AAAA`; valores usam vírgula e duas casas decimais, com ponto
-de milhar opcional. Entradas, saídas e saldos negativos são válidos. Histórico e
+Datas usam `DD/MM/AAAA`; valores aceitam números inteiros ou vírgula com uma ou
+duas casas decimais, com ponto de milhar opcional. Por exemplo, `-19`, `-51,8` e
+`1.234,56` são aceitos e exibidos como `-R$ 19,00`, `-R$ 51,80` e `R$ 1.234,56`.
+Isso vale para Valor, Saldo após a movimentação e saldo informado nos metadados.
+Mais de duas casas decimais são rejeitadas, sem arredondamento automático.
+Entradas, saídas e saldos negativos são válidos. Histórico e
 descrição permanecem separados; só os espaços nas extremidades são removidos.
 O saldo de cada linha é apresentado como **Saldo após a movimentação**, sem
 categorização ou interpretação como gasto/rendimento. O limite da requisição de

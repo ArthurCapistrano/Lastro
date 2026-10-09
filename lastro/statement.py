@@ -56,8 +56,8 @@ def brazilian_date(value: str) -> date:
 
 
 def money(value: str) -> Decimal:
-    if not re.fullmatch(r"[+-]?(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+),[0-9]{2}", value.strip()):
-        raise ValueError("Valor monetário ilegível; use vírgula e duas casas decimais.")
+    if not re.fullmatch(r"[+-]?(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?", value.strip()):
+        raise ValueError("Valor monetário ilegível; use um número inteiro ou vírgula com uma ou duas casas decimais.")
     return Decimal(value.strip().replace(".", "").replace(",", "."))
 
 

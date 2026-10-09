@@ -199,3 +199,70 @@ def test_empty_field_does_not_hide_other_errors_in_same_record() -> None:
     text = BeautifulSoup(response.data, "html.parser").get_text(" ", strip=True)
     for field in ("Data Lançamento", "Histórico", "Valor", "Saldo"):
         assert f"Linha 8 — {field}" in text
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("-19", "-R$ 19,00"),
+        ("-51,8", "-R$ 51,80"),
+        ("-24,9", "-R$ 24,90"),
+        ("-6", "-R$ 6,00"),
+        ("123", "R$ 123,00"),
+        ("123,4", "R$ 123,40"),
+        ("123,45", "R$ 123,45"),
+        ("0", "R$ 0,00"),
+        ("0,1", "R$ 0,10"),
+        ("-0,1", "-R$ 0,10"),
+        ("+19", "R$ 19,00"),
+        ("  -19  ", "-R$ 19,00"),
+        ("1.234", "R$ 1.234,00"),
+        ("1.234,5", "R$ 1.234,50"),
+        ("1.234,56", "R$ 1.234,56"),
+        ("-1.234,5", "-R$ 1.234,50"),
+    ],
+)
+def test_preview_accepts_zero_one_or_two_decimal_places_in_all_money_fields(
+    value: str, expected: str
+) -> None:
+    content = f"""Extrato Conta Corrente;;;;
+Conta;00012345;;;
+Período;01/10/2026 a 08/10/2026;;;
+Saldo;{value};;;
+Data Lançamento;Histórico;Descrição;Valor;Saldo
+07/10/2026;Pix enviado;Exemplo sintético;{value};{value}
+"""
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 200
+    page = BeautifulSoup(response.data, "html.parser")
+    assert f"Saldo informado: {expected}" in page.get_text(" ", strip=True)
+    assert [[cell.get_text(strip=True) for cell in row.select("td")] for row in page.select("tbody tr")] == [
+        ["07/10/2026", "Pix enviado", "Exemplo sintético", expected, expected]
+    ]
+    assert "Bloqueada" not in page.get_text()
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["1,234", "1.23", "1.23,4", "1.234,", "19,", ",5", "1e3", "NaN", "1,2,3", "1.234.56", "++19", "19 00"],
+)
+def test_optional_decimal_places_do_not_allow_malformed_money_or_rounding(value: str) -> None:
+    content = f"""Extrato Conta Corrente;;;;
+Conta;00012345;;;
+Período;01/10/2026 a 08/10/2026;;;
+Saldo;{value};;;
+Data Lançamento;Histórico;Descrição;Valor;Saldo
+07/10/2026;Pix enviado;Exemplo sintético;{value};{value}
+"""
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 422
+    page = BeautifulSoup(response.data, "html.parser")
+    text = page.get_text(" ", strip=True)
+    for message in ("Linha 4 — Saldo", "Linha 6 — Valor", "Linha 6 — Saldo"):
+        assert message in text
+    assert "use um número inteiro ou vírgula com uma ou duas casas decimais" in text
+    assert not page.select("tbody tr")
