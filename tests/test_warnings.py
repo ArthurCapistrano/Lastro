@@ -31,6 +31,45 @@ def acknowledgments(page: BeautifulSoup) -> list[str]:
     return [str(box["value"]) for box in page.select('input[name="reconhecer_avisos"]')]
 
 
+def test_large_inconsistent_balances_require_review_before_confirmation(tmp_path: Path) -> None:
+    client = create_app({"TESTING": True, "STORAGE_PATH": str(tmp_path)}).test_client()
+    content = HEADER + (
+        "07/10/2026;Crédito;Transferência;123456789012345678901234567890,12;123456789012345678901234567890,12\n"
+        "08/10/2026;Crédito;Outra transferência;0,01;123456789012345678901234567900,00\n"
+    )
+    action, page = upload(client, content)
+    assert len(acknowledgments(page)) == 1
+    assert "R$ 123.456.789.012.345.678.901.234.567.890,13" in page.get_text(" ", strip=True)
+    assert client.post(action, data={"confirmar": "sim"}).status_code == 422
+    assert not BeautifulSoup(client.get("/movimentacoes").data, "html.parser").select("tbody tr")
+    response = client.post(action, data={"confirmar": "sim", "reconhecer_avisos": acknowledgments(page)})
+    assert response.status_code == 303
+    rows = BeautifulSoup(client.get(response.headers["Location"]).data, "html.parser").select("tbody tr")
+    assert rows[-1].select("td")[-1].get_text(strip=True) == "R$ 123.456.789.012.345.678.901.234.567.900,00"
+
+
+@pytest.mark.parametrize("previous, amount, balance", [
+    ("123456789012345678901234567890,12", "0,01", "123456789012345678901234567890,13"),
+    ("-123456789012345678901234567890,12", "-0,01", "-123456789012345678901234567890,13"),
+    ("999999999999999999999999999999,99", "0,01", "1000000000000000000000000000000,00"),
+    ("123456789012345678901234567890,12", "-123456789012345678901234567890,11", "0,01"),
+])
+def test_large_coherent_balances_can_be_confirmed_without_review(
+    tmp_path: Path, previous: str, amount: str, balance: str
+) -> None:
+    client = create_app({"TESTING": True, "STORAGE_PATH": str(tmp_path)}).test_client()
+    content = HEADER + (
+        f"07/10/2026;Crédito;Transferência;{previous};{previous}\n"
+        f"08/10/2026;Transferência;Outro lançamento;{amount};{balance}\n"
+    )
+    action, page = upload(client, content)
+    assert not acknowledgments(page)
+    assert "possível incoerência" not in page.get_text(" ", strip=True)
+    response = client.post(action, data={"confirmar": "sim"})
+    assert response.status_code == 303
+    assert client.get(response.headers["Location"] + "/original").data == content.encode()
+
+
 def test_inconsistent_balances_require_review_and_preserve_bank_values(tmp_path: Path) -> None:
     client = create_app({"TESTING": True, "STORAGE_PATH": str(tmp_path)}).test_client()
     content = HEADER + FIRST + INCONSISTENT

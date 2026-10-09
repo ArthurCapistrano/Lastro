@@ -2,7 +2,7 @@ import csv
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from io import StringIO
 from hashlib import sha256
 
@@ -119,8 +119,10 @@ def read_statement(content: bytes) -> Preview:
         else:
             metadata[name] = (line, row[1])
     for name in ("Conta", "Período", "Saldo"):
-        if name not in metadata or not metadata[name][1]:
+        if name not in metadata:
             result.problems.append(Problem(f"Metadado obrigatório ausente: {name}."))
+        elif not metadata[name][1]:
+            result.problems.append(Problem(f"Metadado obrigatório vazio: {name}.", line=metadata[name][0], field=name))
     start = end = None
     balance = None
     if "Período" in metadata and metadata["Período"][1]:
@@ -186,7 +188,10 @@ def balance_warnings(statement: Statement, new_lines: set[int]) -> list[ReviewWa
     for previous, current in zip(ordered, ordered[1:]):
         if previous.source_line not in new_lines and current.source_line not in new_lines:
             continue
-        expected = previous.balance + current.amount
+        with localcontext() as context:
+            # Preserve all integer digits, two decimal places and a possible carry.
+            context.prec = max(previous.balance.adjusted(), current.amount.adjusted(), 0) + 4
+            expected = previous.balance + current.amount
         if expected != current.balance:
             warnings.append(ReviewWarning(
                 f"Linhas {previous.source_line} e {current.source_line} — possível incoerência entre saldos sucessivos: "

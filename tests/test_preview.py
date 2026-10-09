@@ -109,6 +109,26 @@ def test_invalid_metadata_is_explained(original: str, replacement: str, field: s
     assert "ilegível" in text or "invertido" in text
 
 
+@pytest.mark.parametrize("original, field, line", [
+    ("Conta ;00012345;;;", "Conta", 3),
+    ("Período ;01/10/2026 a 08/10/2026;;;", "Período", 4),
+    ("Saldo ;-19,00;;;", "Saldo", 5),
+])
+def test_empty_metadata_reports_original_line_field_and_guidance(original: str, field: str, line: int) -> None:
+    content = "\n" + STATEMENT.replace(original, f"{field};   ;;;")
+    response = create_app({"TESTING": True}).test_client().post(
+        "/previa", data={"arquivo": (BytesIO(content.encode()), "sintetico.csv")}
+    )
+    assert response.status_code == 422
+    page = BeautifulSoup(response.data, "html.parser")
+    text = page.get_text(" ", strip=True)
+    assert f"Linha {line} — {field}" in text
+    assert f"Metadado obrigatório vazio: {field}" in text
+    assert "Exporte novamente" in text
+    assert not page.select('button[name="confirmar"]')
+    assert not page.select('input[type="checkbox"]')
+
+
 @pytest.mark.parametrize("content", [b"\xff\xfe\x00", b'"aspas sem fechamento', b""])
 def test_unreadable_files_have_actionable_errors(content: bytes) -> None:
     response = create_app({"TESTING": True}).test_client().post(
