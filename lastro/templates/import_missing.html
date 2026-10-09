@@ -1,0 +1,7 @@
+{% extends 'index.html' %}
+{% block title %}Importação não encontrada{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold">Importação não encontrada</h1>
+<p>Não há uma importação confirmada neste endereço. Consulte a lista de importações ou envie um extrato.</p>
+<a class="inline-block font-semibold text-emerald-800 underline" href="{{ url_for('imports') }}">Voltar para Importações</a>
+{% endblock %}

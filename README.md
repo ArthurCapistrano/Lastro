@@ -34,7 +34,15 @@ operacional é o limite de acesso assumido.
    a conta na primeira confirmação e abre o comprovante. Repetir a confirmação
    retorna o mesmo resultado.
 6. Consulte o comprovante em **Importações** ou os registros em **Movimentações**.
-   O comprovante informa as linhas de origem e permite baixar o CSV intacto.
+    O comprovante informa as linhas de origem e permite baixar o CSV intacto.
+
+Em **Importações**, cada extrato confirmado apresenta arquivo, conta, período,
+data de importação (UTC) e contagens de movimentações novas e já existentes.
+Clique no nome do arquivo para consultar todas as suas linhas, inclusive as já
+conhecidas de outros extratos, ou baixar o original. Extratos guardados apenas
+para registro aparecem normalmente com zero novas. Os detalhes permitem voltar
+à lista; endereços de importações inexistentes mostram uma mensagem sem expor
+outros arquivos locais. Não há edição nem exclusão de importações.
 
 As prévias são temporárias, mantidas em memória no servidor, sem dados financeiros
 em cookies. Ao encerrar a aplicação, prévias não confirmadas são descartadas;
@@ -131,7 +139,8 @@ banco. A conferência adicional usa Chromium/Playwright com um servidor loopback
 temporário: verifica HTMX, erros, cancelamento, funcionamento sem JavaScript e
 layout em desktop e celular, além de sobreposição, origens compartilhadas,
 redirecionamento de arquivo idêntico, consentimento para zero novas e reconhecimento
-individual dos avisos de saldo.
+individual dos avisos de saldo, além de navegação pela lista e pelos detalhes de
+importações, download original e estados de lista vazia e importação inexistente.
 Salva capturas **sintéticas** em
 `/tmp/opencode/lastro-browser/` para inspeção visual. Em ambientes sem bibliotecas
 de sistema do Chromium, instale-as conforme as instruções do Playwright.

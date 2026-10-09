@@ -1,7 +1,12 @@
 {% extends 'index.html' %}
 {% from 'movement_cells.html' import movement_cells %}
+{% set page_title = 'Importações' if view == 'imports' else 'Movimentações' if view == 'movements' else 'Importação confirmada' %}
+{% block title %}{{ page_title }}{% endblock %}
 {% block content %}
-<h1 class="text-3xl font-bold">{{ 'Importações' if view == 'imports' else 'Movimentações' if view == 'movements' else 'Importação confirmada' }}</h1>
+<h1 class="text-3xl font-bold">{{ page_title }}</h1>
+{% if view == 'detail' %}
+<a class="inline-block font-semibold text-emerald-800 underline" href="{{ url_for('imports') }}">Voltar para Importações</a>
+{% endif %}
 {% if imports %}
 {% for imported in imports %}
 {% set statement = imported.statement %}
@@ -20,7 +25,7 @@
     <thead class="bg-slate-50"><tr><th>Linha do CSV</th><th>Data Lançamento</th><th>Histórico</th><th>Descrição</th><th>Valor</th><th>Saldo após a movimentação</th></tr></thead>
     <tbody class="divide-y divide-slate-100">
     {% for movement in statement.movements %}
-      <tr><td class="p-3"><a class="underline" href="{{ url_for('import_detail', id=imported.id) }}">{{ movement.source_line }}</a></td>{{ movement_cells(movement) }}</tr>
+      <tr><td class="p-3">{{ movement.source_line }}</td>{{ movement_cells(movement) }}</tr>
     {% endfor %}
     </tbody>
   </table>

@@ -130,17 +130,17 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         return render_template("history.html", imports=storage.imports(), view="imports")
 
     @app.get("/importacoes/<id>")
-    def import_detail(id: str) -> str:
+    def import_detail(id: str) -> str | tuple[str, int]:
         imported = storage.get(id)
         if imported is None:
-            abort(404)
+            return render_template("import_missing.html"), 404
         return render_template("history.html", imports=[imported], view="detail")
 
     @app.get("/importacoes/<id>/original")
-    def original(id: str) -> Response:
+    def original(id: str) -> Response | tuple[str, int]:
         imported = storage.get(id)
         if imported is None:
-            abort(404)
+            return render_template("import_missing.html"), 404
         return send_file(storage.original_path(id), as_attachment=True, download_name=imported.filename, mimetype="text/csv")
 
     @app.get("/movimentacoes")
