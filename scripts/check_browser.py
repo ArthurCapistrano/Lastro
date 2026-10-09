@@ -1,0 +1,82 @@
+"""Repeatable browser check using only synthetic financial data."""
+
+from pathlib import Path
+from threading import Thread
+
+from playwright.sync_api import expect, sync_playwright
+from werkzeug.serving import make_server
+
+from lastro import create_app
+
+
+SAMPLE = """Extrato Conta Corrente;;;;
+Conta;00012345;;;
+Período;01/10/2026 a 08/10/2026;;;
+Saldo;-19,00;;;
+;;;;
+Data Lançamento;Histórico;Descrição;Valor;Saldo
+07/10/2026;  Crédito B3  ;  Resgate de aplicação  ;1.234,56;1.234,56
+08/10/2026;Pagamento;Compra de exemplo;-1.253,56;-19,00
+"""
+
+
+def main() -> None:
+    output = Path("/tmp/opencode/lastro-browser")
+    output.mkdir(parents=True, exist_ok=True)
+    server = make_server("127.0.0.1", 0, create_app())
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 1050})
+            page = context.new_page()
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(base_url)
+            assert page.evaluate("typeof htmx") == "object"
+            assert page.get_by_role("button", name="Conferir prévia").evaluate("element => getComputedStyle(element).backgroundColor") != "rgba(0, 0, 0, 0)"
+            page.locator("#arquivo").set_input_files({"name": "sintetico.csv", "mimeType": "text/csv", "buffer": SAMPLE.encode()})
+            with page.expect_response(lambda response: response.url.endswith("/previa")) as response:
+                page.get_by_role("button", name="Conferir prévia").click()
+            assert response.value.request.headers.get("hx-request") == "true"
+            assert page.url == base_url + "/"
+            expect(page.locator("tbody tr")).to_have_count(2)
+            expect(page.get_by_text("Saldo informado:")).to_contain_text("-R$ 19,00")
+            expect(page.get_by_role("columnheader", name="Saldo após a movimentação")).to_be_visible()
+            page.screenshot(path=str(output / "desktop-preview.png"), full_page=True)
+            page.set_viewport_size({"width": 375, "height": 812})
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            expect(page.get_by_role("link", name="Cancelar prévia")).to_be_visible()
+            page.screenshot(path=str(output / "mobile-preview.png"), full_page=True)
+            page.get_by_role("link", name="Cancelar prévia").click()
+            expect(page.locator("tbody tr")).to_have_count(0)
+            page.locator("#arquivo").set_input_files({"name": "invalido.csv", "mimeType": "text/csv", "buffer": SAMPLE.replace("-1.253,56", "inválido").encode()})
+            page.get_by_role("button", name="Conferir prévia").click()
+            expect(page.get_by_role("heading", name="Prévia bloqueada")).to_be_visible()
+            expect(page.get_by_text("Linha 8 — Valor:")).to_be_visible()
+            expect(page.locator('input[type="checkbox"]')).to_have_count(0)
+            page.screenshot(path=str(output / "mobile-errors.png"), full_page=True)
+            assert not errors, errors
+            context.close()
+            no_js = browser.new_context(java_script_enabled=False)
+            page = no_js.new_page()
+            page.goto(base_url)
+            page.locator("#arquivo").set_input_files({"name": "sintetico.csv", "mimeType": "text/csv", "buffer": SAMPLE.encode()})
+            page.get_by_role("button", name="Conferir prévia").click()
+            expect(page.locator("tbody tr")).to_have_count(2)
+            assert page.url.endswith("/previa")
+            page.get_by_role("link", name="Cancelar prévia").click()
+            expect(page.locator("tbody tr")).to_have_count(0)
+            no_js.close()
+            browser.close()
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+    print(f"Browser checks passed. Synthetic screenshots: {output}")
+
+
+if __name__ == "__main__":
+    main()

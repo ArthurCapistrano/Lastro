@@ -66,6 +66,17 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+# Local financial files; synthetic test samples are constructed in Python.
+*.csv
+*.sqlite
+*.sqlite3
+*.db
+
+# Reproducible frontend build outputs.
+node_modules/
+lastro/static/app.css
+lastro/static/htmx.min.js
+
 # Scrapy stuff:
 .scrapy
 

@@ -1,0 +1,11 @@
+@import "tailwindcss" source(none);
+@source "../lastro/templates";
+
+@layer base {
+  th, td { @apply px-5 py-4; }
+  th { @apply whitespace-nowrap font-semibold; }
+  button, a, input { @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700; }
+}
+
+.htmx-indicator { display: none; }
+.htmx-request.htmx-indicator { display: inline; }

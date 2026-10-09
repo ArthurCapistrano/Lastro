@@ -1,0 +1,14 @@
+{
+  "name": "lastro-assets",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i assets/app.css -o lastro/static/app.css --minify && node scripts/copy-htmx.mjs"
+  },
+  "dependencies": {
+    "htmx.org": "2.0.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.0",
+    "tailwindcss": "4.3.0"
+  }
+}
